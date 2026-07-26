@@ -36,7 +36,6 @@ const gemini = new OpenAI({
 // ==========================================
 // النماذج الافتراضية لكل نوع ولكل مزود
 // ==========================================
-// تم تغيير OpenRouter الافتراضي لنموذج مجاني وممتاز لتفادي مشكلة الرصيد
 const MODEL_MAP = {
     summary: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" },
     quiz: { provider: openrouter, model: "meta-llama/llama-3.3-70b-instruct:free", name: "OpenRouter" },
@@ -46,7 +45,6 @@ const MODEL_MAP = {
     chat: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" }
 };
 
-// النماذج الآمنة للاستخدام كبدائل في حال فشل المزود الأساسي (لكل مزود الموديل الصحيح الخاص به)
 const AVAILABLE_PROVIDERS = [
     { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" },
     { provider: openrouter, model: "meta-llama/llama-3.3-70b-instruct:free", name: "OpenRouter" },
@@ -68,12 +66,8 @@ function cleanJSONResponse(content) {
         cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
 
-    // 🔥 الحماية القصوى لمعادلات الرياضيات (LaTeX) داخل الـ JSON
-    // 1. نقوم بمضاعفة جميع الشرطات المائلة \ لتصبح \\
     cleaned = cleaned.replace(/\\/g, "\\\\");
-    // 2. نعيد إصلاح علامات التنصيص الأساسية للـ JSON لكي لا تتكسر
     cleaned = cleaned.replace(/\\\\"/g, '\\"');
-    // 3. نعيد إصلاح رموز الأسطر والمسافات الافتراضية
     cleaned = cleaned.replace(/\\\\n/g, '\\n');
     cleaned = cleaned.replace(/\\\\t/g, '\\t');
     cleaned = cleaned.replace(/\\\\r/g, '\\r');
@@ -81,7 +75,8 @@ function cleanJSONResponse(content) {
     return cleaned;
 }
 
-async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
+// 🔥 التعديل هنا: إضافة history و customSystemPrompt إلى المتغيرات المستقبلة
+async function generateAI({ prompt, type, requestedProvider, requestedModel, history = [], customSystemPrompt = null }) {
     let primaryConfig = {
         provider: MODEL_MAP[type]?.provider || groq,
         model: MODEL_MAP[type]?.model || "llama-3.3-70b-versatile",
@@ -95,20 +90,17 @@ async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
         cerebras: { instance: cerebras, name: "Cerebras" }
     };
 
-    // التحقق من المزود المطلوب من التطبيق
     if (requestedProvider) {
         const provKey = requestedProvider.toLowerCase();
         if (providerInstances[provKey]) {
             primaryConfig.provider = providerInstances[provKey].instance;
             primaryConfig.name = providerInstances[provKey].name;
 
-            // إذا طلب التطبيق مزود معين ولكنه لم يحدد الموديل الصحيح، نضع الموديل الافتراضي للمزود لتفادي خطأ 400
             const safeModelMatch = AVAILABLE_PROVIDERS.find(p => p.name === primaryConfig.name);
             primaryConfig.model = safeModelMatch ? safeModelMatch.model : primaryConfig.model;
         }
     }
 
-    // تحديث الموديل إذا طُلب صراحةً وكان يتناسب مع المزود
     if (requestedModel) {
         primaryConfig.model = requestedModel;
     }
@@ -119,25 +111,33 @@ async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
     ];
 
     const isChat = type === 'chat';
-    const systemPrompt = isChat
-        ? "أنت مساعد تعليمي ذكي وودود. أجب على أسئلة الطالب بناءً على الدرس المقدم بوضوح. أجب باللغة العربية دائماً وبنسق منسق (Markdown)."
-        : "You are an AI that outputs ONLY strict valid JSON. No markdown, no conversational text.";
 
-    const temperature = isChat ? 0.7 : 0.2; // تقليل الحرارة في الـ JSON لضمان الهيكل
+    // 🔥 التعديل هنا: الدالة الآن تتعرف على customSystemPrompt
+    const systemPrompt = customSystemPrompt || (isChat
+        ? "أنت مساعد تعليمي ذكي وودود. أجب على أسئلة الطالب باللغة العربية وبنسق (Markdown)."
+        : "You are an AI that outputs ONLY strict valid JSON. No markdown, no conversational text.");
+    
+    const temperature = isChat ? 0.7 : 0.2; 
 
     for (const config of attemptConfigs) {
         try {
             console.log(`⏳ Trying provider: ${config.name} with model: ${config.model} for type: ${type}...`);
+
+            const messages = [{ role: "system", content: systemPrompt }];
+            
+            // إضافة السجل إن وجد
+            if (isChat && history.length > 0) {
+                messages.push(...history);
+            }
+            
+            messages.push({ role: "user", content: prompt });
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => { controller.abort(); }, 60000);
 
             const response = await config.provider.chat.completions.create({
                 model: config.model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: prompt }
-                ],
+                messages: messages,
                 temperature: temperature
             }, { signal: controller.signal });
 
@@ -184,7 +184,6 @@ app.get("/ai-models", async (req, res) => {
         }
 
         try {
-            // إضافة النماذج المجانية والمضمونة يدوياً للسرعة
             modelsData.OpenRouter = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-lite-preview-02-05:free", "deepseek/deepseek-chat"];
         } catch (e) {
             modelsData.OpenRouter = ["meta-llama/llama-3.3-70b-instruct:free"];
@@ -239,22 +238,26 @@ app.get("/lessons", async (req, res) => {
 
 app.post("/generate", async (req, res) => {
     try {
-        const { lessonId, lesson, type = "summary", aiProvider, aiModel } = req.body;
+        const { lessonId, lesson, question, history = [], type = "summary", aiProvider, aiModel } = req.body;
 
         if (type === 'chat') {
-            const aiResult = await generateAI({
-                prompt: lesson,
-                type: 'chat',
-                requestedProvider: aiProvider,
-                requestedModel: aiModel
+            const customSystemPrompt = `أنت مساعد تعليمي ذكي وودود. أجب على أسئلة الطالب بناءً على الدرس التالي حصراً:\n\n${lesson}\n\nأجب باللغة العربية دائماً وبنسق (Markdown).`;
+
+            const aiResult = await generateAI({ 
+                prompt: question, 
+                type: 'chat', 
+                requestedProvider: aiProvider, 
+                requestedModel: aiModel,
+                history: history, 
+                customSystemPrompt: customSystemPrompt
             });
 
-            return res.json({
-                success: true,
-                data: { chat: aiResult.content }
+            return res.json({ 
+                success: true, 
+                data: { chat: aiResult.content } 
             });
         }
-
+        
         const prompt = `
         أنت مساعد تعليمي ذكي.
         نص الدرس: ${lesson}
@@ -280,6 +283,7 @@ app.post("/generate", async (req, res) => {
         }
         `;
 
+        // 💡 للأنواع الأخرى نرسل فقط البيانات المطلوبة (لا نرسل history ولا customSystemPrompt)
         const aiResult = await generateAI({ prompt, type, requestedProvider: aiProvider, requestedModel: aiModel });
 
         const cleanContent = cleanJSONResponse(aiResult.content);

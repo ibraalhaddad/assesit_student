@@ -77,20 +77,30 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     if (!inputText.trim() || loading) return;
 
-    const userMessage = { id: Date.now().toString(), role: 'user', content: inputText };
+    // حفظ السؤال في متغير وإضافته للشاشة فوراً
+    const currentQuery = inputText;
+    const userMessage = { id: Date.now().toString(), role: 'user', content: currentQuery };
     const updatedMessages = [...messages, userMessage];
     
     setMessages(updatedMessages);
     saveSession(updatedMessages);
     
-    const currentQuery = inputText;
     setInputText('');
     setLoading(true);
+
+    // 💡 التعديل الاحترافي: تجهيز السجل للسيرفر
+    // نأخذ مصفوفة messages السابقة (لا تشمل السؤال الحالي لأنه يُرسل منفرداً)
+    // نقتطع آخر 6 رسائل فقط، ونرسل الـ role والـ content فقط (بدون الـ id)
+    const historyToSend = messages
+      .slice(-6)
+      .map(msg => ({ role: msg.role, content: msg.content }));
 
     try {
       const response = await apiClient.post('/generate', {
         lessonId: lessonId || null,
-        lesson: `محتوى الدرس السياقي:\n${content}\n\nسؤال المستخدم: ${currentQuery}`,
+        lesson: content, // نرسل محتوى الدرس الصافي ليكون في الـ System Prompt
+        question: currentQuery, // السؤال الجديد يرسل كطلب منفصل
+        history: historyToSend, // نرسل آخر 6 رسائل فقط للحفاظ على الـ Tokens
         type: 'chat',
         aiProvider: selectedProvider,
         aiModel: selectedModel,
@@ -109,6 +119,7 @@ export default function ChatScreen() {
         throw new Error('فشل الرد من الخادم');
       }
     } catch (error) {
+      console.error("Chat API Error:", error);
       const errorMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: 'عذراً، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي أو نفاد الرصيد.' };
       const finalMessages = [...updatedMessages, errorMessage];
       setMessages(finalMessages);
