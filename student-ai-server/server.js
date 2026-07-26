@@ -25,7 +25,7 @@ const openrouter = new OpenAI({
 
 const cerebras = new OpenAI({
     apiKey: process.env.CEREBRAS_API_KEY,
-    baseURL: "https://api.cerebras.ai/v1" 
+    baseURL: "https://api.cerebras.ai/v1"
 });
 
 const gemini = new OpenAI({
@@ -33,19 +33,24 @@ const gemini = new OpenAI({
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
 });
 
-// خريطة النماذج الافتراضية
+// ==========================================
+// النماذج الافتراضية لكل نوع ولكل مزود
+// ==========================================
+// تم تغيير OpenRouter الافتراضي لنموذج مجاني وممتاز لتفادي مشكلة الرصيد
 const MODEL_MAP = {
     summary: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" },
-    quiz: { provider: openrouter, model: "deepseek/deepseek-r1", name: "OpenRouter" },
+    quiz: { provider: openrouter, model: "meta-llama/llama-3.3-70b-instruct:free", name: "OpenRouter" },
     flashcards: { provider: groq, model: "qwen/qwen3-32b", name: "Groq" },
     math: { provider: gemini, model: "gemini-1.5-flash", name: "Gemini" },
-    explanation: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" }
+    explanation: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" },
+    chat: { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" }
 };
 
+// النماذج الآمنة للاستخدام كبدائل في حال فشل المزود الأساسي (لكل مزود الموديل الصحيح الخاص به)
 const AVAILABLE_PROVIDERS = [
     { provider: groq, model: "llama-3.3-70b-versatile", name: "Groq" },
+    { provider: openrouter, model: "meta-llama/llama-3.3-70b-instruct:free", name: "OpenRouter" },
     { provider: gemini, model: "gemini-1.5-flash", name: "Gemini" },
-    { provider: openrouter, model: "deepseek/deepseek-r1", name: "OpenRouter" },
     { provider: cerebras, model: "llama3.1-8b", name: "Cerebras" }
 ];
 
@@ -56,26 +61,31 @@ const AVAILABLE_PROVIDERS = [
 function cleanJSONResponse(content) {
     let cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    
+
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1) {
         cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
 
-    cleaned = cleaned.replace(/(?<!\\)\\frac/g, "\\\\frac");
-    cleaned = cleaned.replace(/\\([^"\\/bfnrt])/g, "\\\\$1");
-    cleaned = cleaned.replace(/\\\\\\([a-zA-Z])/g, '\\\\\\\\$1');
+    // 🔥 الحماية القصوى لمعادلات الرياضيات (LaTeX) داخل الـ JSON
+    // 1. نقوم بمضاعفة جميع الشرطات المائلة \ لتصبح \\
+    cleaned = cleaned.replace(/\\/g, "\\\\");
+    // 2. نعيد إصلاح علامات التنصيص الأساسية للـ JSON لكي لا تتكسر
+    cleaned = cleaned.replace(/\\\\"/g, '\\"');
+    // 3. نعيد إصلاح رموز الأسطر والمسافات الافتراضية
+    cleaned = cleaned.replace(/\\\\n/g, '\\n');
+    cleaned = cleaned.replace(/\\\\t/g, '\\t');
+    cleaned = cleaned.replace(/\\\\r/g, '\\r');
 
     return cleaned;
 }
 
-// تعديل الدالة لتقبل الموديل المخصص (requestedModel)
 async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
-    let primaryConfig = { 
-        provider: MODEL_MAP[type]?.provider || groq, 
-        model: MODEL_MAP[type]?.model || "llama-3.3-70b-versatile", 
-        name: MODEL_MAP[type]?.name || "Groq" 
+    let primaryConfig = {
+        provider: MODEL_MAP[type]?.provider || groq,
+        model: MODEL_MAP[type]?.model || "llama-3.3-70b-versatile",
+        name: MODEL_MAP[type]?.name || "Groq"
     };
 
     const providerInstances = {
@@ -85,26 +95,39 @@ async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
         cerebras: { instance: cerebras, name: "Cerebras" }
     };
 
+    // التحقق من المزود المطلوب من التطبيق
     if (requestedProvider) {
         const provKey = requestedProvider.toLowerCase();
         if (providerInstances[provKey]) {
             primaryConfig.provider = providerInstances[provKey].instance;
             primaryConfig.name = providerInstances[provKey].name;
+
+            // إذا طلب التطبيق مزود معين ولكنه لم يحدد الموديل الصحيح، نضع الموديل الافتراضي للمزود لتفادي خطأ 400
+            const safeModelMatch = AVAILABLE_PROVIDERS.find(p => p.name === primaryConfig.name);
+            primaryConfig.model = safeModelMatch ? safeModelMatch.model : primaryConfig.model;
         }
     }
 
+    // تحديث الموديل إذا طُلب صراحةً وكان يتناسب مع المزود
     if (requestedModel) {
         primaryConfig.model = requestedModel;
     }
 
     const attemptConfigs = [
         primaryConfig,
-        ...AVAILABLE_PROVIDERS.filter(p => p.name !== primaryConfig.name || p.model !== primaryConfig.model)
+        ...AVAILABLE_PROVIDERS.filter(p => p.name !== primaryConfig.name)
     ];
+
+    const isChat = type === 'chat';
+    const systemPrompt = isChat
+        ? "أنت مساعد تعليمي ذكي وودود. أجب على أسئلة الطالب بناءً على الدرس المقدم بوضوح. أجب باللغة العربية دائماً وبنسق منسق (Markdown)."
+        : "You are an AI that outputs ONLY strict valid JSON. No markdown, no conversational text.";
+
+    const temperature = isChat ? 0.7 : 0.2; // تقليل الحرارة في الـ JSON لضمان الهيكل
 
     for (const config of attemptConfigs) {
         try {
-            console.log(`⏳ Trying provider: ${config.name} with model: ${config.model}...`);
+            console.log(`⏳ Trying provider: ${config.name} with model: ${config.model} for type: ${type}...`);
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => { controller.abort(); }, 60000);
@@ -112,10 +135,10 @@ async function generateAI({ prompt, type, requestedProvider, requestedModel }) {
             const response = await config.provider.chat.completions.create({
                 model: config.model,
                 messages: [
-                    { role: "system", content: "You are an AI that outputs ONLY strict valid JSON. No markdown, no conversational text." },
+                    { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.3
+                temperature: temperature
             }, { signal: controller.signal });
 
             clearTimeout(timeoutId);
@@ -149,7 +172,6 @@ app.get("/test-db", async (req, res) => {
     }
 });
 
-// 🔥 مسار جديد: جلب النماذج المتاحة من المزودين
 app.get("/ai-models", async (req, res) => {
     try {
         const modelsData = {};
@@ -162,10 +184,10 @@ app.get("/ai-models", async (req, res) => {
         }
 
         try {
-            const openrouterModels = await openrouter.models.list();
-            modelsData.OpenRouter = openrouterModels.data.map(m => m.id);
+            // إضافة النماذج المجانية والمضمونة يدوياً للسرعة
+            modelsData.OpenRouter = ["meta-llama/llama-3.3-70b-instruct:free", "google/gemini-2.0-flash-lite-preview-02-05:free", "deepseek/deepseek-chat"];
         } catch (e) {
-            modelsData.OpenRouter = ["deepseek/deepseek-r1", "openai/gpt-4o", "anthropic/claude-3.5-sonnet"];
+            modelsData.OpenRouter = ["meta-llama/llama-3.3-70b-instruct:free"];
         }
 
         try {
@@ -217,8 +239,21 @@ app.get("/lessons", async (req, res) => {
 
 app.post("/generate", async (req, res) => {
     try {
-        // 🔥 استقبال aiModel من الطلب
         const { lessonId, lesson, type = "summary", aiProvider, aiModel } = req.body;
+
+        if (type === 'chat') {
+            const aiResult = await generateAI({
+                prompt: lesson,
+                type: 'chat',
+                requestedProvider: aiProvider,
+                requestedModel: aiModel
+            });
+
+            return res.json({
+                success: true,
+                data: { chat: aiResult.content }
+            });
+        }
 
         const prompt = `
         أنت مساعد تعليمي ذكي.
@@ -229,8 +264,7 @@ app.post("/generate", async (req, res) => {
         تعليمات صارمة جداً (CRITICAL INSTRUCTIONS):
         1. أخرج النتيجة بصيغة JSON صحيح فقط (Valid JSON Object). لا تستخدم Markdown format.
         2. لا تضف أي نص أو شرح قبل أو بعد الـ JSON.
-        3. هام جداً للمعادلات الرياضية (LaTeX): يمنع استخدام شرطة مائلة واحدة (\\). يجب مضاعفة الـ Backslash! اكتب \\\\sqrt بدلاً من \\sqrt، واكتب \\\\frac بدلاً من \\frac لكي لا يتعطل الـ JSON.
-        4. التزم بهذا الهيكل تماماً:
+        3. تأكد من استخدام المفاتيح المطلوبة تماماً كما هو موضح أدناه:
         - إذا كان المطلوب summary: { "summary": "النص هنا" }
         - إذا كان المطلوب explanation: { "explanation": "النص هنا" }
         - إذا كان المطلوب flashcards: { "flashcards": [ { "term": "المصطلح", "definition": "التعريف" } ] }
@@ -246,7 +280,6 @@ app.post("/generate", async (req, res) => {
         }
         `;
 
-        // تمرير aiProvider و aiModel للدالة
         const aiResult = await generateAI({ prompt, type, requestedProvider: aiProvider, requestedModel: aiModel });
 
         const cleanContent = cleanJSONResponse(aiResult.content);
@@ -256,7 +289,7 @@ app.post("/generate", async (req, res) => {
             parsedResponse = JSON.parse(cleanContent);
         } catch (e) {
             console.error("Failed to parse JSON response. Raw string was:\n", cleanContent);
-            return res.status(500).json({ success: false, error: "الذكاء الاصطناعي أرجع بيانات غير مهيكلة بشكل صحيح. يرجى المحاولة مرة أخرى." });
+            return res.status(500).json({ success: false, error: "فشل في معالجة البيانات، يرجى المحاولة مرة أخرى." });
         }
 
         const dbResult = await db.query(

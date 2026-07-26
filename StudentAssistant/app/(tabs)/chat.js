@@ -1,46 +1,99 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, FlatList, 
-  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator 
+  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView 
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import apiClient from '../../api/client'; // تأكد من مسار ملف الـ client لديك
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiClient from '../../api/client';
 
 export default function ChatScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // استقبال بيانات الدرس والمزود والموديل الممررة عبر الـ params
-  const { lessonId, title, content, aiProvider, aiModel } = params;
+  // استقبال بيانات الدرس والمزود والموديل
+  const { lessonId, title, content, aiProvider: initialProvider, aiModel: initialModel } = params;
 
-  const [messages, setMessages] = useState([
-    { 
-      id: '1', 
-      role: 'assistant', 
-      content: `أهلاً بك! أنا مستعد لمساعدتك في فهم درس "${title || 'المختار'}". تفطّل واطرح أي سؤال.` 
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // حالات المزود والموديل الخاصة بجلسة الشات الحالية (قابلة للتغيير)
+  const [availableModels, setAvailableModels] = useState({});
+  const [selectedProvider, setSelectedProvider] = useState(initialProvider || '');
+  const [selectedModel, setSelectedModel] = useState(initialModel || '');
+  const [showSettings, setShowSettings] = useState(false);
+
   const flatListRef = useRef(null);
+  const storageKey = `chat_session_${lessonId || 'general'}`;
+
+  // 1. جلب النماذج المتاحة وتنزيل جلسة المحادثة المحفوظة سابقاً لهذا الدرس
+  useEffect(() => {
+    fetchAvailableModels();
+    loadSavedSession();
+  }, [lessonId]);
+
+  const fetchAvailableModels = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/ai-models');
+      const data = await response.json();
+      if (data.success) {
+        setAvailableModels(data.models);
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI models:", error);
+    }
+  };
+
+  const loadSavedSession = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem(storageKey);
+      if (savedData) {
+        const parsedMessages = JSON.parse(savedData);
+        setMessages(parsedMessages);
+      } else {
+        // رسالة ترحيبية افتراضية تلقائية عند فتح الدرس لأول مرة
+        const initialMsg = {
+          id: '1',
+          role: 'assistant',
+          content: `أهلاً بك! هذه جلسة عمل خاصة بالدرس: "${title || 'المختار'}". أنا جاهز لمساعدتك، تلخيص الأفكار، أو الإجابة على أسئلتك.`
+        };
+        setMessages([initialMsg]);
+        saveSession([initialMsg]);
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+    }
+  };
+
+  const saveSession = async (newMessages) => {
+    try {
+      await AsyncStorage.setItem(storageKey, JSON.stringify(newMessages));
+    } catch (error) {
+      console.error('Error saving session:', error);
+    }
+  };
 
   const sendMessage = async () => {
     if (!inputText.trim() || loading) return;
 
     const userMessage = { id: Date.now().toString(), role: 'user', content: inputText };
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    
+    setMessages(updatedMessages);
+    saveSession(updatedMessages);
+    
     const currentQuery = inputText;
     setInputText('');
     setLoading(true);
 
     try {
-      // إرسال طلب المحادثة إلى الخادم الخلفي
       const response = await apiClient.post('/generate', {
         lessonId: lessonId || null,
         lesson: `محتوى الدرس السياقي:\n${content}\n\nسؤال المستخدم: ${currentQuery}`,
-        type: 'chat', // نوع الطلب محادثة
-        aiProvider: aiProvider || '',
-        aiModel: aiModel || '',
+        type: 'chat',
+        aiProvider: selectedProvider,
+        aiModel: selectedModel,
       });
 
       if (response.data.success) {
@@ -48,16 +101,73 @@ export default function ChatScreen() {
         const aiReply = aiData.chat || aiData.summary || JSON.stringify(aiData);
         
         const assistantMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: aiReply };
-        setMessages(prev => [...prev, assistantMessage]);
+        const finalMessages = [...updatedMessages, assistantMessage];
+        
+        setMessages(finalMessages);
+        saveSession(finalMessages);
       } else {
         throw new Error('فشل الرد من الخادم');
       }
     } catch (error) {
-      const errorMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: 'عذراً، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.' };
-      setMessages(prev => [...prev, errorMessage]);
+      const errorMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: 'عذراً، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي أو نفاد الرصيد.' };
+      const finalMessages = [...updatedMessages, errorMessage];
+      setMessages(finalMessages);
+      saveSession(finalMessages);
     } finally {
       setLoading(false);
     }
+  };
+
+  // لوحة تغيير المزود والموديل من داخل صفحة الشات
+  const renderSettingsBar = () => {
+    const providers = Object.keys(availableModels);
+    const modelsForCurrentProvider = selectedProvider ? (availableModels[selectedProvider] || []) : [];
+
+    if (!showSettings) return null;
+
+    return (
+      <View style={styles.settingsPanel}>
+        <Text style={styles.settingsTitle}>تغيير مزود وموديل الذكاء الاصطناعي للجلسة:</Text>
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          <TouchableOpacity 
+            style={[styles.chip, selectedProvider === '' && styles.activeChip]}
+            onPress={() => { setSelectedProvider(''); setSelectedModel(''); }}
+          >
+            <Text style={[styles.chipText, selectedProvider === '' && styles.activeChipText]}>تلقائي</Text>
+          </TouchableOpacity>
+          {providers.map((prov, idx) => (
+            <TouchableOpacity 
+              key={idx}
+              style={[styles.chip, selectedProvider === prov && styles.activeChip]}
+              onPress={() => { setSelectedProvider(prov); setSelectedModel(''); }}
+            >
+              <Text style={[styles.chipText, selectedProvider === prov && styles.activeChipText]}>{prov}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {selectedProvider !== '' && modelsForCurrentProvider.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipScroll, { marginTop: 6 }]}>
+            <TouchableOpacity 
+              style={[styles.chip, selectedModel === '' && styles.activeChip]}
+              onPress={() => setSelectedModel('')}
+            >
+              <Text style={[styles.chipText, selectedModel === '' && styles.activeChipText]}>الموديل الافتراضي</Text>
+            </TouchableOpacity>
+            {modelsForCurrentProvider.map((mod, idx) => (
+              <TouchableOpacity 
+                key={idx}
+                style={[styles.chip, selectedModel === mod && styles.activeChip]}
+                onPress={() => setSelectedModel(mod)}
+              >
+                <Text style={[styles.chipText, selectedModel === mod && styles.activeChipText]}>{mod}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    );
   };
 
   const renderItem = ({ item }) => {
@@ -77,13 +187,24 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* شريط علوي بسيط يوضح عنوان الدرس */}
+      {/* شريط علوي */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backText}>← عودة</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{title || 'محادثة الذكاء الاصطناعي'}</Text>
+        <View style={{ flex: 1, marginHorizontal: 10 }}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{title || 'محادثة الدرس'}</Text>
+          <Text style={styles.headerSubtitle}>
+            {selectedProvider ? `المزود: ${selectedProvider} ${selectedModel ? `(${selectedModel})` : ''}` : 'المزود: تلقائي'}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.settingsToggleBtn} onPress={() => setShowSettings(!showSettings)}>
+          <Text style={styles.settingsToggleText}>⚙️ إعدادات AI</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* لوحة إعدادات المزود والموديل المتغيرة */}
+      {renderSettingsBar()}
 
       {/* قائمة الرسائل */}
       <FlatList
@@ -95,19 +216,18 @@ export default function ChatScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
-      {/* مؤشر التحميل عند انتظار رد الـ AI */}
       {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color="#007bff" />
-          <Text style={styles.loadingText}>جاري التفكير...</Text>
+          <Text style={styles.loadingText}>جاري التفكير والتوليد...</Text>
         </View>
       )}
 
-      {/* شريط إدخال الرسالة */}
+      {/* شريط الإدخال */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="اكتب سؤالك حول الدرس..."
+          placeholder="اكتب رسالتك أو استفسارك هنا..."
           placeholderTextColor="#888"
           value={inputText}
           onChangeText={setInputText}
@@ -123,10 +243,20 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f9' },
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  backBtn: { marginRight: 15 },
-  backText: { color: '#007bff', fontWeight: 'bold', fontSize: 16 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: 'bold', color: '#333', textAlign: 'right' },
+  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  backBtn: { paddingRight: 5 },
+  backText: { color: '#007bff', fontWeight: 'bold', fontSize: 15 },
+  headerTitle: { fontSize: 15, fontWeight: 'bold', color: '#333', textAlign: 'right' },
+  headerSubtitle: { fontSize: 11, color: '#666', textAlign: 'right', marginTop: 2 },
+  settingsToggleBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  settingsToggleText: { fontSize: 12, fontWeight: 'bold', color: '#333' },
+  settingsPanel: { backgroundColor: '#fff', padding: 10, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  settingsTitle: { fontSize: 12, fontWeight: 'bold', color: '#555', textAlign: 'right', marginBottom: 6 },
+  chipScroll: { flexDirection: 'row' },
+  chip: { backgroundColor: '#e2e8f0', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, marginHorizontal: 3 },
+  activeChip: { backgroundColor: '#007bff' },
+  chipText: { fontSize: 11, color: '#333', fontWeight: '600' },
+  activeChipText: { color: '#fff' },
   chatList: { padding: 15, paddingBottom: 20 },
   messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 12, marginVertical: 6 },
   userBubble: { backgroundColor: '#007bff', alignSelf: 'flex-end', borderBottomRightRadius: 2 },
