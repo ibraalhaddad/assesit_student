@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, Text, FlatList, TouchableOpacity, StyleSheet, 
-  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl, Picker 
+  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl 
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router'; // 1. استيراد الراوتر
 import { getLessons, requestAiAction } from '../../api/services';
 
 export default function LessonsScreen() {
+  const router = useRouter(); // 2. تعريف الموجه
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,7 +27,7 @@ export default function LessonsScreen() {
 
   const fetchAvailableModels = async () => {
     try {
-      const response = await fetch('http://localhost:3000/ai-models'); // استبدل الرابط برابط السيرفر لديك
+      const response = await fetch('http://localhost:3000/ai-models');
       const data = await response.json();
       if (data.success) {
         setAvailableModels(data.models);
@@ -82,6 +83,21 @@ export default function LessonsScreen() {
     }
   };
 
+  // وظيفة الانتقال إلى صفحة الشات مع تمرير بيانات الدرس والمزود والموديل
+  const navigateToChat = (item) => {
+    const content = item.html_content || item.content;
+    router.push({
+      pathname: '/chat', // تأكد أن ملف الشات موجود في app/chat.js
+      params: {
+        lessonId: item.id,
+        title: item.title,
+        content: content,
+        aiProvider: selectedProvider,
+        aiModel: selectedModel
+      }
+    });
+  };
+
   // قسم اختيار المزود والموديل بشكل تفاعلي
   const renderProviderSelector = () => {
     const providers = Object.keys(availableModels);
@@ -111,7 +127,6 @@ export default function LessonsScreen() {
           ))}
         </ScrollView>
 
-        {/* عرض الموديلات الخاصة بالمزود المختار ديناميكياً */}
         {selectedProvider !== "" && modelsForCurrentProvider.length > 0 && (
           <>
             <Text style={[styles.providerTitle, { marginTop: 10 }]}>اختر الموديل التابع لـ {selectedProvider}:</Text>
@@ -143,8 +158,11 @@ export default function LessonsScreen() {
 
   const renderLessonItem = ({ item }) => (
     <View style={styles.card}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.snippet} numberOfLines={3}>{item.html_content || item.content}</Text>
+      {/* 3. جعل العنوان والفقرة قابلين للضغط للانتقال إلى صفحة الـ Chat */}
+      <TouchableOpacity onPress={() => navigateToChat(item)}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.snippet} numberOfLines={3}>{item.html_content || item.content}</Text>
+      </TouchableOpacity>
       
       <View style={styles.actions}>
         <TouchableOpacity 
@@ -229,7 +247,7 @@ const styles = StyleSheet.create({
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   loadingBox: { backgroundColor: '#fff', padding: 25, borderRadius: 12, alignItems: 'center' },
   loadingText: { marginTop: 12, fontWeight: 'bold', color: '#333' },
-  emptyText: { textAlign: 'center',نتائج: 30, color: '#666', fontSize: 16 },
+  emptyText: { textAlign: 'center', color: '#666', fontSize: 16 },
   modalContainer: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 20, maxHeight: '80%' },
   modalHeader: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#007bff', marginBottom: 15 },
