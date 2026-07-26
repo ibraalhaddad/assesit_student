@@ -18,12 +18,14 @@ export const getLessons = async () => {
   return response.data;
 };
 
-// 4. طلب تلخيص أو اختبار من الـ AI (مع إرسال رقم الدرس لحفظه)
-export const requestAiAction = async (lessonId, lessonText, actionType, level = 'جامعي') => {
+// 4. طلب تلخيص أو اختبار من الـ AI (مع إرسال رقم الدرس والمزود والموديل المختار)
+export const requestAiAction = async (lessonId, lessonText, actionType, aiProvider, aiModel, level = 'جامعي') => {
   const response = await apiClient.post('/generate', {
     lessonId: lessonId || null,
     lesson: lessonText,
     type: actionType, // 'summary' or 'quiz'
+    aiProvider: aiProvider, // المزود المختار (Groq, Gemini, إلخ)
+    aiModel: aiModel,       // 🔥 الموديل المختار بالتحديد (مثل gemma2-9b-it)
     level: level
   });
   return response.data;

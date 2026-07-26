@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, Text, FlatList, TouchableOpacity, StyleSheet, 
-  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl 
+  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl, Picker 
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getLessons, requestAiAction } from '../../api/services';
@@ -13,6 +13,28 @@ export default function LessonsScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  // حالات المزود والموديل المختار
+  const [availableModels, setAvailableModels] = useState({});
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
+
+  // جلب النماذج المتاحة من الخادم عند بدء التشغيل
+  useEffect(() => {
+    fetchAvailableModels();
+  }, []);
+
+  const fetchAvailableModels = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/ai-models'); // استبدل الرابط برابط السيرفر لديك
+      const data = await response.json();
+      if (data.success) {
+        setAvailableModels(data.models);
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI models:", error);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -40,11 +62,11 @@ export default function LessonsScreen() {
   const handleAiRequest = async (lessonId, lessonContent, type) => {
     setAiLoading(true);
     try {
-      // type يمكن أن يكون: summary, explanation, quiz, flashcards
-      const result = await requestAiAction(lessonId, lessonContent, type);
+      // تمرير selectedProvider و selectedModel إلى دالة الطلب
+      const result = await requestAiAction(lessonId, lessonContent, type, selectedProvider, selectedModel);
+      
       if (result.success) {
         const responseData = result.data;
-        // استخراج القيمة بناءً على العمود المعني في جدول قاعدة البيانات
         const contentToShow = responseData[type] || responseData;
 
         setAiResult({
@@ -58,6 +80,65 @@ export default function LessonsScreen() {
     } finally {
       setAiLoading(false);
     }
+  };
+
+  // قسم اختيار المزود والموديل بشكل تفاعلي
+  const renderProviderSelector = () => {
+    const providers = Object.keys(availableModels);
+    const modelsForCurrentProvider = selectedProvider ? (availableModels[selectedProvider] || []) : [];
+
+    return (
+      <View style={styles.providerContainer}>
+        <Text style={styles.providerTitle}>اختر المزود:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerScroll}>
+          <TouchableOpacity
+            style={[styles.providerChip, selectedProvider === "" && styles.providerChipActive]}
+            onPress={() => { setSelectedProvider(""); setSelectedModel(""); }}
+          >
+            <Text style={[styles.providerText, selectedProvider === "" && styles.providerTextActive]}>تلقائي (افتراضي)</Text>
+          </TouchableOpacity>
+
+          {providers.map((providerName, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[styles.providerChip, selectedProvider === providerName && styles.providerChipActive]}
+              onPress={() => { setSelectedProvider(providerName); setSelectedModel(""); }}
+            >
+              <Text style={[styles.providerText, selectedProvider === providerName && styles.providerTextActive]}>
+                {providerName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* عرض الموديلات الخاصة بالمزود المختار ديناميكياً */}
+        {selectedProvider !== "" && modelsForCurrentProvider.length > 0 && (
+          <>
+            <Text style={[styles.providerTitle, { marginTop: 10 }]}>اختر الموديل التابع لـ {selectedProvider}:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providerScroll}>
+              <TouchableOpacity
+                style={[styles.providerChip, selectedModel === "" && styles.providerChipActive]}
+                onPress={() => setSelectedModel("")}
+              >
+                <Text style={[styles.providerText, selectedModel === "" && styles.providerTextActive]}>الموديل الافتراضي</Text>
+              </TouchableOpacity>
+
+              {modelsForCurrentProvider.map((modelId, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.providerChip, selectedModel === modelId && styles.providerChipActive]}
+                  onPress={() => setSelectedModel(modelId)}
+                >
+                  <Text style={[styles.providerText, selectedModel === modelId && styles.providerTextActive]}>
+                    {modelId}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+      </View>
+    );
   };
 
   const renderLessonItem = ({ item }) => (
@@ -85,6 +166,8 @@ export default function LessonsScreen() {
 
   return (
     <View style={styles.container}>
+      {renderProviderSelector()}
+
       {aiLoading && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingBox}>
@@ -101,7 +184,7 @@ export default function LessonsScreen() {
           data={lessons}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderLessonItem}
-          contentContainerStyle={{ padding: 15 }}
+          contentContainerStyle={{ padding: 15, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
             <Text style={styles.emptyText}>لا توجد دروس حالياً. أضف درساً جديداً من تبويب "إدخال بيانات".</Text>
@@ -128,6 +211,13 @@ export default function LessonsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f9' },
+  providerContainer: { backgroundColor: '#fff', paddingVertical: 10, elevation: 2, zIndex: 1, marginBottom: 10 },
+  providerTitle: { textAlign: 'right', fontWeight: 'bold', fontSize: 13, color: '#555', marginRight: 15, marginBottom: 6 },
+  providerScroll: { paddingHorizontal: 10 },
+  providerChip: { backgroundColor: '#e2e8f0', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, marginHorizontal: 4 },
+  providerChipActive: { backgroundColor: '#007bff' },
+  providerText: { color: '#333', fontSize: 12, fontWeight: '600' },
+  providerTextActive: { color: '#fff' },
   card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 15, elevation: 3 },
   title: { fontSize: 18, fontWeight: 'bold', textAlign: 'right', marginBottom: 8, color: '#1a1a1a' },
   snippet: { color: '#555', textAlign: 'right', marginBottom: 16, lineHeight: 22 },
@@ -139,6 +229,7 @@ const styles = StyleSheet.create({
   loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   loadingBox: { backgroundColor: '#fff', padding: 25, borderRadius: 12, alignItems: 'center' },
   loadingText: { marginTop: 12, fontWeight: 'bold', color: '#333' },
+  emptyText: { textAlign: 'center',نتائج: 30, color: '#666', fontSize: 16 },
   modalContainer: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 20, maxHeight: '80%' },
   modalHeader: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#007bff', marginBottom: 15 },
