@@ -5,10 +5,10 @@ import { router } from 'expo-router';
 
 // 1. بيانات وهمية مرنة (Mock Data)
 const STUDY_PROGRESS = [
-  { id: '1', title: 'البرمجيات', percentage: 80 },
-  { id: '2', title: 'اللغات', percentage: 75 },
-  { id: '3', title: 'الشبكات', percentage: 60 },
-  { id: '4', title: 'الذكاء الاصطناعي', percentage: 90 },
+  { id: '1', title: 'الرياضيات', percentage: 80 },
+  { id: '2', title: 'English', percentage: 75 },
+  { id: '3', title: 'الفيزياء', percentage: 60 },
+  { id: '4', title: 'الأحياء', percentage: 90 },
 ];
 
 const UPCOMING_TASKS = [
@@ -31,7 +31,7 @@ export default function HomeScreen() {
         <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7} onPress={() => router.push('/')}>
           <Ionicons name="person-outline" size={20} color="#4F46E5" />
         </TouchableOpacity>
-        
+
         <View style={styles.headerBrand}>
           <View style={styles.brandIconBox}>
             <Ionicons name="school" size={16} color="#FFF" />
@@ -113,7 +113,7 @@ export default function HomeScreen() {
         </View>
 
         {/* بطاقة دردشة الذكاء الاصطناعي المميزة */}
-        <TouchableOpacity style={styles.aiBannerCard} activeOpacity={0.9}>
+        <TouchableOpacity style={styles.aiBannerCard} activeOpacity={0.9} onPress={() => router.push('/chat')}>
           <View style={styles.aiIconCircle}>
             <MaterialCommunityIcons name="robot-outline" size={26} color="#FFF" />
           </View>
@@ -124,33 +124,130 @@ export default function HomeScreen() {
           <Ionicons name="chevron-back" size={20} color="#4F46E5" />
         </TouchableOpacity>
 
+        {/* ــــــــــــــــــــــــ الأيقونات السريعة الجديدة (مواد، اختبار، خطة...) ــــــــــــــــــــــــ */}
+        <View style={styles.quickServicesContainer}>
+          <Text style={styles.sectionHeading}>الخدمات السريعة</Text>
+          <View style={styles.quickServicesGrid}>
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/selecttermsubject')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="book-outline" size={22} color="#4F46E5" />
+              </View>
+              <Text style={styles.quickServiceText}>المواد</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/general-exams')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="document-text-outline" size={22} color="#D97706" />
+              </View>
+              <Text style={styles.quickServiceText}>اختبار</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/study-plan')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="calendar-outline" size={22} color="#059669" />
+              </View>
+              <Text style={styles.quickServiceText}>خطة</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/statistics')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#F3E8FF' }]}>
+                <Ionicons name="journal-outline" size={22} color="#9333EA" />
+              </View>
+              <Text style={styles.quickServiceText}>احصائيات</Text>
+            </TouchableOpacity>
+
+          </View>
+          <View style={styles.quickServicesGrid}>
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/notes')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="book-outline" size={22} color="#4F46E5" />
+              </View>
+              <Text style={styles.quickServiceText}>الملاحظات</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/community')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="document-text-outline" size={22} color="#D97706" />
+              </View>
+              <Text style={styles.quickServiceText}>المجنمع</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/settings')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="calendar-outline" size={22} color="#059669" />
+              </View>
+              <Text style={styles.quickServiceText}>الإعدادات</Text>
+            </TouchableOpacity>
+
+
+            <TouchableOpacity
+              style={styles.quickServiceItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/achievements')}
+            >
+              <View style={[styles.quickServiceIcon, { backgroundColor: '#F3E8FF' }]}>
+                <Ionicons name="journal-outline" size={22} color="#9333EA" />
+              </View>
+              <Text style={styles.quickServiceText}>انجازات</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </ScrollView>
 
       {/* شريط التنقل السفلي المخصص */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={() => router.push('/add')}>
           <Ionicons name="book-outline" size={22} color="#64748B" />
           <Text style={styles.navText}>مساحة دراسة</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={() => router.push('/savedlessons')}>
           <Ionicons name="documents-outline" size={22} color="#64748B" />
           <Text style={styles.navText}>كتب الفصل</Text>
         </TouchableOpacity>
-        
+
         {/* الأيقونة البارزة في المنتصف (الرئيسية) */}
         <View style={styles.fabContainer}>
-          <TouchableOpacity style={styles.fabButton} activeOpacity={0.9}>
+          <TouchableOpacity style={styles.fabButton} activeOpacity={0.9} onPress={() => router.push('/aiResponse')}>
             <Ionicons name="home" size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={() => router.push('/chat')} >
           <Ionicons name="chatbubbles-outline" size={22} color="#64748B" />
           <Text style={styles.navText}>الذكاء الاصطناعي</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={() => router.push('/')}>
+        <TouchableOpacity style={styles.navItem} activeOpacity={0.7} onPress={() => router.push('/profile')}>
           <Ionicons name="person-outline" size={22} color="#64748B" />
           <Text style={styles.navText}>حسابي</Text>
         </TouchableOpacity>
@@ -167,7 +264,7 @@ export default function HomeScreen() {
           {/* مساحة النقر لإغلاق القائمة */}
           <Pressable style={styles.modalBackdrop} onPress={toggleSidebar} />
 
-          {/* محتوى القائمة الجانبية (تظهر من جهة اليمين لتناسب اللغة العربية) */}
+          {/* محتوى القائمة الجانبية */}
           <View style={styles.sidebarContainer}>
             {/* رأس القائمة الجانبية */}
             <View style={styles.sidebarHeader}>
@@ -233,7 +330,7 @@ export default function HomeScreen() {
 
             {/* زر تسجيل الخروج في أسفل القائمة */}
             <View style={styles.sidebarFooter}>
-              <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={() => { toggleSidebar(); router.push('/'); }}>
+              <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={() => { toggleSidebar(); router.push('/login'); }}>
                 <Text style={styles.logoutText}>تسجيل الخروج</Text>
                 <Ionicons name="log-out-outline" size={20} color="#EF4444" />
               </TouchableOpacity>
@@ -248,48 +345,48 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 20, 
-    paddingVertical: 12, 
-    backgroundColor: '#FFF', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#F1F5F9' 
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9'
   },
-  iconCircle: { 
-    width: 38, 
-    height: 38, 
-    borderRadius: 19, 
-    backgroundColor: '#EEF2FF', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  brandIconBox: { 
-    width: 28, 
-    height: 28, 
-    borderRadius: 8, 
-    backgroundColor: '#4F46E5', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  brandIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   headerTitleText: { fontSize: 18, fontWeight: 'bold', color: '#1E293B' },
   scrollContainer: { padding: 16, paddingBottom: 90 },
-  sectionHeading: { fontSize: 15, fontWeight: '700', color: '#64748B', marginBottom: 14, textAlign: 'right' },
+  sectionHeading: { fontSize: 15, fontWeight: '700', color: '#64748B', marginBottom: 12, marginTop: 12, textAlign: 'right' },
   row: { flexDirection: 'row-reverse', gap: 12, marginBottom: 12 },
-  card: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 16, 
-    padding: 14, 
-    borderWidth: 1, 
-    borderColor: '#F1F5F9', 
-    shadowColor: '#64748B', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.05, 
-    shadowRadius: 6, 
-    elevation: 2 
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2
   },
   progressItem: { marginBottom: 10 },
   progressInfoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -297,21 +394,21 @@ const styles = StyleSheet.create({
   progressVal: { fontSize: 12, fontWeight: 'bold', color: '#4F46E5' },
   barBg: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' },
   barFill: { height: '100%', backgroundColor: '#4F46E5', borderRadius: 3 },
-  smallActionCard: { 
-    backgroundColor: '#FFF', 
-    borderRadius: 14, 
-    padding: 12, 
-    flexDirection: 'row-reverse', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: '#F1F5F9', 
+  smallActionCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     flex: 1,
     gap: 10,
-    shadowColor: '#64748B', 
-    shadowOffset: { width: 0, height: 1 }, 
-    shadowOpacity: 0.03, 
-    shadowRadius: 4, 
-    elevation: 1 
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1
   },
   actionIconBox: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
   actionTextBox: { flex: 1, alignItems: 'flex-end' },
@@ -321,14 +418,14 @@ const styles = StyleSheet.create({
   fakeChartBox: { height: 95, alignItems: 'center', justifyContent: 'center' },
   chartMainVal: { fontSize: 15, fontWeight: 'bold', color: '#1E293B', marginTop: 4 },
   chartSub: { fontSize: 10, color: '#94A3B8', marginTop: 1 },
-  aiBannerCard: { 
-    backgroundColor: '#EEF2FF', 
-    borderRadius: 16, 
-    padding: 16, 
-    flexDirection: 'row-reverse', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: '#C7D2FE', 
+  aiBannerCard: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
     marginTop: 4,
     shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
@@ -340,6 +437,45 @@ const styles = StyleSheet.create({
   aiTitle: { fontSize: 14, fontWeight: 'bold', color: '#312E81', textAlign: 'right' },
   aiSubtitle: { fontSize: 11, color: '#4338CA', textAlign: 'right', marginTop: 2 },
   aiIconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center' },
+
+  /* التنسيقات الخاصة بالأيقونات السريعة الجديدة */
+  quickServicesContainer: {
+    marginTop: 8,
+  },
+  quickServicesGrid: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  quickServiceItem: {
+    flex: 1,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  quickServiceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  quickServiceText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#334155',
+    textAlign: 'center',
+  },
+
   bottomNav: {
     flexDirection: 'row',
     height: 70,

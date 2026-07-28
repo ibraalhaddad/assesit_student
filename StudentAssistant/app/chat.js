@@ -1,23 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, FlatList, 
-  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView 
+import {
+  View, Text, TextInput, TouchableOpacity, FlatList,
+  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from '../../api/client';
+import apiClient from '../api/client';
 
 export default function ChatScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+
   // استقبال بيانات الدرس والمزود والموديل
   const { lessonId, title, content, aiProvider: initialProvider, aiModel: initialModel } = params;
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // حالات المزود والموديل الخاصة بجلسة الشات الحالية (قابلة للتغيير)
   const [availableModels, setAvailableModels] = useState({});
   const [selectedProvider, setSelectedProvider] = useState(initialProvider || '');
@@ -81,10 +81,10 @@ export default function ChatScreen() {
     const currentQuery = inputText;
     const userMessage = { id: Date.now().toString(), role: 'user', content: currentQuery };
     const updatedMessages = [...messages, userMessage];
-    
+
     setMessages(updatedMessages);
     saveSession(updatedMessages);
-    
+
     setInputText('');
     setLoading(true);
 
@@ -109,10 +109,10 @@ export default function ChatScreen() {
       if (response.data.success) {
         const aiData = response.data.data;
         const aiReply = aiData.chat || aiData.summary || JSON.stringify(aiData);
-        
+
         const assistantMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: aiReply };
         const finalMessages = [...updatedMessages, assistantMessage];
-        
+
         setMessages(finalMessages);
         saveSession(finalMessages);
       } else {
@@ -139,16 +139,16 @@ export default function ChatScreen() {
     return (
       <View style={styles.settingsPanel}>
         <Text style={styles.settingsTitle}>تغيير مزود وموديل الذكاء الاصطناعي للجلسة:</Text>
-        
+
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.chip, selectedProvider === '' && styles.activeChip]}
             onPress={() => { setSelectedProvider(''); setSelectedModel(''); }}
           >
             <Text style={[styles.chipText, selectedProvider === '' && styles.activeChipText]}>تلقائي</Text>
           </TouchableOpacity>
           {providers.map((prov, idx) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={idx}
               style={[styles.chip, selectedProvider === prov && styles.activeChip]}
               onPress={() => { setSelectedProvider(prov); setSelectedModel(''); }}
@@ -160,14 +160,14 @@ export default function ChatScreen() {
 
         {selectedProvider !== '' && modelsForCurrentProvider.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipScroll, { marginTop: 6 }]}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.chip, selectedModel === '' && styles.activeChip]}
               onPress={() => setSelectedModel('')}
             >
               <Text style={[styles.chipText, selectedModel === '' && styles.activeChipText]}>الموديل الافتراضي</Text>
             </TouchableOpacity>
             {modelsForCurrentProvider.map((mod, idx) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={idx}
                 style={[styles.chip, selectedModel === mod && styles.activeChip]}
                 onPress={() => setSelectedModel(mod)}
@@ -193,8 +193,8 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { getSavedAiResponses } from '../../api/services';
+import { getSavedAiResponses } from '../api/services';
 
 export default function SavedResponsesScreen() {
   const [responses, setResponses] = useState([]);

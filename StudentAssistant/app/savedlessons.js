@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  View, Text, FlatList, TouchableOpacity, StyleSheet, 
-  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl 
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  ActivityIndicator, Alert, Modal, ScrollView, RefreshControl
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router'; // 1. استيراد الراوتر
-import { getLessons, requestAiAction } from '../../api/services';
+import { getLessons, requestAiAction } from '../api/services';
 
 export default function LessonsScreen() {
   const router = useRouter(); // 2. تعريف الموجه
@@ -14,7 +14,7 @@ export default function LessonsScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  
+
   // حالات المزود والموديل المختار
   const [availableModels, setAvailableModels] = useState({});
   const [selectedProvider, setSelectedProvider] = useState("");
@@ -65,7 +65,7 @@ export default function LessonsScreen() {
     try {
       // تمرير selectedProvider و selectedModel إلى دالة الطلب
       const result = await requestAiAction(lessonId, lessonContent, type, selectedProvider, selectedModel);
-      
+
       if (result.success) {
         const responseData = result.data;
         const contentToShow = responseData[type] || responseData;
@@ -163,17 +163,17 @@ export default function LessonsScreen() {
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.snippet} numberOfLines={3}>{item.html_content || item.content}</Text>
       </TouchableOpacity>
-      
+
       <View style={styles.actions}>
-        <TouchableOpacity 
-          style={[styles.btn, styles.summaryBtn]} 
+        <TouchableOpacity
+          style={[styles.btn, styles.summaryBtn]}
           onPress={() => handleAiRequest(item.id, item.html_content || item.content, 'summary')}
           disabled={aiLoading}>
           <Text style={styles.btnText}>Summary 📝</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.btn, styles.quizBtn]} 
+        <TouchableOpacity
+          style={[styles.btn, styles.quizBtn]}
           onPress={() => handleAiRequest(item.id, item.html_content || item.content, 'quiz')}
           disabled={aiLoading}>
           <Text style={styles.btnText}>Quiz 🤖</Text>

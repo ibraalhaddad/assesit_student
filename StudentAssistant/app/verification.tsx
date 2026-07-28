@@ -20,7 +20,7 @@ export default function VerificationScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/(tabs)/home')}>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/selectGrade')}>
           <Text style={styles.primaryButtonText}>تحقق وتأكيد</Text>
         </TouchableOpacity>
 

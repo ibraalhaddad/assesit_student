@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { addLessonData } from '../../api/services';
+import { addLessonData } from '../api/services';
 
 export default function AddDataScreen() {
   const [title, setTitle] = useState('');
@@ -11,7 +11,7 @@ export default function AddDataScreen() {
 
   const handleSave = async () => {
     setSuccessMessage(''); // إخفاء أي رسالة قديمة
-    
+
     if (!title.trim() || !htmlContent.trim()) {
       setSuccessMessage('⚠️ يجدر كتابة عنوان ومحتوى الدرس أولاً');
       return;
